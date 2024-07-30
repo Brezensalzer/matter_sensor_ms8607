@@ -35,6 +35,9 @@ MatterPressure matter_pressure_sensor;
 MS8607 barometricSensor;
 static const uint8_t I2C_PWR = PB2;
 
+#include <SparkFun_MAX1704x_Fuel_Gauge_Arduino_Library.h>
+SFE_MAX1704X lipo(MAX1704X_MAX17048);
+
 void setup()
 {
   pinMode(LED_BUILTIN, OUTPUT);
@@ -67,11 +70,11 @@ void setup()
     delay(200);
   }
 
-  if (!Matter.isDeviceConnected()) {
+  if (!Matter.isDeviceThreadConnected()) {
     if (DEBUG) { Serial.println("Waiting for network connection..."); }
     digitalWrite(LED_BUILTIN, HIGH);
   }
-  while (!Matter.isDeviceConnected()) {
+  while (!Matter.isDeviceThreadConnected()) {
     delay(200);
   }
   if (DEBUG) { Serial.println("Device connected"); }
@@ -122,6 +125,39 @@ void loop()
   float current_pressure_hpa = barometricSensor.getPressure();
   matter_pressure_sensor.set_measured_value(current_pressure_hpa);
   if (DEBUG) { Serial.printf("Current pressure: %.01f hPa\n", current_pressure_hpa); }
+
+  // --- battery ---
+  if (!lipo.begin()) {
+    if (DEBUG) { Serial.println(F("MAX17048 not detected, please check wiring")); }
+    while (10) ;
+  }
+  uint8_t id = lipo.getID();
+  if (DEBUG) {
+    Serial.print("Chip ID: 0x");
+    Serial.println(id, HEX);
+  }
+  lipo.quickStart();
+  lipo.setThreshold(20);
+
+  double voltage = lipo.getVoltage();
+  double soc = lipo.getSOC(); 
+  bool alert = lipo.getAlert();
+
+  if (DEBUG) {
+    Serial.print("Voltage: ");
+    Serial.print(voltage);
+    Serial.println(" V");
+
+    Serial.print("Percentage: ");
+    Serial.print(soc);
+    Serial.println("%");
+
+    if (alert) {
+      Serial.print("Alert: ");
+      Serial.println(alert);
+      Serial.println();
+    }
+  }
 
   // power down i2c...
   Wire.end();
